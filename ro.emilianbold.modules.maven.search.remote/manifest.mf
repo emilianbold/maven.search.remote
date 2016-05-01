@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+AutoUpdate-Show-In-Client: true
+OpenIDE-Module: ro.emilianbold.modules.maven.search.remote
+OpenIDE-Module-Localizing-Bundle: ro/emilianbold/modules/maven/search/remote/Bundle.properties
+OpenIDE-Module-Specification-Version: 1.0
+
