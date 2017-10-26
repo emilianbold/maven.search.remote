@@ -33,15 +33,19 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import okhttp3.CacheControl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -54,11 +58,13 @@ import org.netbeans.modules.maven.indexer.spi.GenericFindQuery;
 import org.netbeans.modules.maven.indexer.spi.ResultImplementation;
 
 /* package protected */ class MavenCentralGenericFindQuery implements GenericFindQuery {
+    private final OkHttpClient client;
     
-    private final static int CONNECTION_TIMEOUT = 10 * 1000;
-    private final static int READ_TIMEOUT = 10 * 1000;
-
     private final static int SEARCH_ROWS = 500;
+
+    public MavenCentralGenericFindQuery(OkHttpClient client) {
+        this.client = client;
+    }
 
     @Override
     public ResultImplementation<NBVersionInfo> find(List<QueryField> fields, final List<RepositoryInfo> repos) {
@@ -168,11 +174,16 @@ import org.netbeans.modules.maven.indexer.spi.ResultImplementation;
 	try {
 	    URL u = new URL(mavenSearchURLText);
 
-	    URLConnection connection = u.openConnection();
-	    connection.setConnectTimeout(CONNECTION_TIMEOUT);
-	    connection.setReadTimeout(READ_TIMEOUT);
+            Request okRequest = new Request.Builder()
+                    .url(u)
+                    .cacheControl(new CacheControl.Builder()
+                            .maxStale(5, TimeUnit.MINUTES)
+                            .build())
+                    .build();
 
-	    try (InputStream in = connection.getInputStream()) {
+            Response okResponse = client.newCall(okRequest).execute();
+
+	    try (InputStream in = okResponse.body().byteStream()) {
 		ph.progress(Bundle.query_parsing());
 		Object parse = JSONValue.parse(new BufferedReader(new InputStreamReader(in)));
 		if (!(parse instanceof JSONObject)) {

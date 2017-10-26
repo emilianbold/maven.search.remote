@@ -26,11 +26,16 @@
  */
 package ro.emilianbold.modules.maven.search.remote;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import okhttp3.Cache;
+import okhttp3.OkHttpClient;
 import org.netbeans.modules.maven.indexer.api.NBVersionInfo;
 import org.netbeans.modules.maven.indexer.api.QueryField;
 import org.netbeans.modules.maven.indexer.api.RepositoryInfo;
@@ -44,12 +49,34 @@ import org.netbeans.modules.maven.indexer.spi.DependencyInfoQueries;
 import org.netbeans.modules.maven.indexer.spi.GenericFindQuery;
 import org.netbeans.modules.maven.indexer.spi.RepositoryIndexQueryProvider;
 import org.netbeans.modules.maven.indexer.spi.ResultImplementation;
+import org.openide.modules.Places;
+import org.openide.util.Exceptions;
 import org.openide.util.lookup.ServiceProvider;
 
 @ServiceProvider(service = RepositoryIndexQueryProvider.class, position = 100)
 public class MavenCentralOnlineRepositoryIndexQueryProvider implements RepositoryIndexQueryProvider {
 
+    private final static int CONNECTION_TIMEOUT = Integer.getInteger("maven.search.remote.timeout.connect", 10) * 1000; //NOI18N
+    private final static int READ_TIMEOUT = Integer.getInteger("maven.search.remote.timeout.read", 10) * 1000; //NOI18N
+    private final static int CACHE_SIZE_MB = Integer.getInteger("maven.search.remote.cache.size", 10) * 1024 * 1024;  //NOI18N
+
+    private final OkHttpClient client;
+
     public MavenCentralOnlineRepositoryIndexQueryProvider() {
+        File cacheFolder = Places.getCacheSubdirectory("maven.search.remote/okhttpcache"); //NOI18N
+        Cache cache = new Cache(cacheFolder, CACHE_SIZE_MB);
+        //reset cache on start
+        try {
+            cache.evictAll();
+        } catch (IOException ex) {
+            Exceptions.printStackTrace(ex);
+        }
+
+        client = new OkHttpClient.Builder()
+                .connectTimeout(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS)
+                .readTimeout(READ_TIMEOUT, TimeUnit.MILLISECONDS)
+                .cache(cache)
+                .build();
     }
 
     @Override
@@ -59,7 +86,7 @@ public class MavenCentralOnlineRepositoryIndexQueryProvider implements Repositor
 
     @Override
     public GenericFindQuery getGenericFindQuery() {
-	return new MavenCentralGenericFindQuery();
+	return new MavenCentralGenericFindQuery(client);
     }
 
     @Override
